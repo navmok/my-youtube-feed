@@ -1,31 +1,25 @@
 // app/api/videos/route.js
-export const runtime = "nodejs";
+export const runtime = "nodejs"; // ensures Node.js runtime
 
 import axios from "axios";
 
-const MAX_RETRIES = 3; // max retry attempts
+const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000; // initial delay between retries
 
-async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<any> {
-  let attempt = 0;
-  let delay = RETRY_DELAY_MS;
-
-  while (attempt <= retries) {
+async function fetchWithRetry(url, retries = MAX_RETRIES) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await axios.get(url);
-    } catch (err: any) {
-      attempt++;
-      if (attempt > retries || (err.response && err.response.status < 500)) {
-        // if non-transient error, throw immediately
-        throw err;
-      }
-      console.warn(`Retrying (${attempt}/${retries}) after error: ${err.message}`);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay *= 2; // exponential backoff
+      const res = await axios.get(url);
+      return res.data;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`Retrying (${attempt}/${retries})...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
     }
   }
 }
 
+// GET /api/videos
 export async function GET() {
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
@@ -70,39 +64,28 @@ export async function GET() {
       "UCEAZeUIeJs0IjQiqTCdVSIg",
     ];
 
-    const allVideos: any[] = [];
+    const allVideos = [];
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const publishedAfter = thirtyDaysAgo.toISOString();
 
     for (const id of channels) {
       try {
-        // Get channel info
-        const channelRes = await fetchWithRetry(
-          `https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&id=${id}&part=snippet`
-        );
-        const channelName = channelRes.data.items?.[0]?.snippet?.title || "Unknown Channel";
-
-        // Get videos
         const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${id}&part=snippet&type=video&order=date&maxResults=10&publishedAfter=${publishedAfter}`;
-        const res = await fetchWithRetry(url);
+        const data = await fetchWithRetry(url);
 
-        if (Array.isArray(res.data.items)) {
-          const videosWithChannel = res.data.items.map((video) => ({
+        if (Array.isArray(data.items)) {
+          const videosWithChannel = data.items.map((video) => ({
             ...video,
             channelId: id,
-            channelTitle: channelName,
           }));
           allVideos.push(...videosWithChannel);
         }
-      } catch (err: any) {
-        console.warn(
-          `⚠️ Skipping channel ${id}: ${err.response?.status} ${err.response?.data?.error?.message || err.message}`
-        );
+      } catch (err) {
+        console.warn(`⚠️ Skipping channel ${id}: ${err.response?.status || ""} ${err.message}`);
       }
     }
 
-    // Sort newest → oldest
     allVideos.sort(
       (a, b) => new Date(b.snippet.publishedAt).getTime() - new Date(a.snippet.publishedAt).getTime()
     );
