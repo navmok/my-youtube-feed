@@ -43,13 +43,18 @@ export default function Home() {
       {!loading && videos.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
           {videos.map((video) => (
-            <div
+            <a
               key={video.id.videoId}
+              href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 border: "1px solid #ddd",
                 borderRadius: "8px",
                 padding: "0.5rem",
                 width: "320px",
+                textDecoration: "none",
+                color: "inherit",
               }}
             >
               <p style={{ fontWeight: "bold" }}>{video.channelTitle}</p>
@@ -64,7 +69,7 @@ export default function Home() {
               <p style={{ fontSize: "0.8rem", color: "#555" }}>
                 {new Date(video.snippet.publishedAt).toLocaleString()}
               </p>
-            </div>
+            </a>
           ))}
         </div>
       )}
