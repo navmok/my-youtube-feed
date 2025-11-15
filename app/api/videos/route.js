@@ -1,7 +1,6 @@
 // app/api/videos/route.js
 import axios from "axios";
 
-// GET /api/videos
 export async function GET() {
   try {
     const channels = [
@@ -11,17 +10,11 @@ export async function GET() {
     ];
 
     const apiKey = process.env.YOUTUBE_API_KEY;
-    // Debug: check if key exists
+
     if (!apiKey) {
-      console.error("Vercel is not seeing YOUTUBE_API_KEY!");
-      return new Response(
-        JSON.stringify({ error: "API key not set in Vercel environment" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+      console.log("❌ API KEY missing inside route!");
+      return new Response(JSON.stringify([]), { status: 200 });
     }
-  
-    // For security: don't print the key itself
-    console.log("Vercel sees the API key: ✅");
 
     const allVideos = [];
 
@@ -29,27 +22,29 @@ export async function GET() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const publishedAfter = thirtyDaysAgo.toISOString();
 
-    // Fetch videos for each channel
     for (const id of channels) {
       try {
         const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${id}&part=snippet&type=video&order=date&maxResults=10&publishedAfter=${publishedAfter}`;
         const res = await axios.get(url);
 
         if (Array.isArray(res.data.items)) {
-          const videosWithChannel = res.data.items.map(video => ({
+          const videosWithChannel = res.data.items.map((video) => ({
             ...video,
-            channelId: id, // keep the channel reference
+            channelId: id,
           }));
           allVideos.push(...videosWithChannel);
         }
       } catch (err) {
         console.error(`Failed to fetch channel ${id}:`, err.message);
-        // just skip this channel if it fails, no need to push empty object
+        // DO NOT push results — just continue
       }
     }
 
-    // Sort all videos newest → oldest
-    allVideos.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+    // Sort newest → oldest
+    allVideos.sort(
+      (a, b) =>
+        new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt)
+    );
 
     return new Response(JSON.stringify(allVideos), {
       status: 200,
