@@ -49,6 +49,7 @@ export default function Home() {
               target="_blank"
               rel="noopener noreferrer"
               style={{
+                display: "block",
                 border: "1px solid #ddd",
                 borderRadius: "8px",
                 padding: "0.5rem",
