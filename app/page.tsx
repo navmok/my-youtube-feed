@@ -4,12 +4,9 @@ import { useEffect, useState } from "react";
 
 interface Video {
   id: { videoId: string };
-  snippet: {
-    title: string;
-    thumbnails: { medium: { url: string } };
-    publishedAt: string;
-  };
+  snippet: { title: string; thumbnails: { medium: { url: string } }; publishedAt: string };
   channelId: string;
+  channelTitle: string;
 }
 
 export default function Home() {
@@ -20,13 +17,8 @@ export default function Home() {
     const fetchVideos = async () => {
       try {
         const res = await fetch("/api/videos");
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setVideos(data);
-        } else {
-          console.error("API returned invalid data:", data);
-          setVideos([]);
-        }
+        const json: Video[] = await res.json();
+        setVideos(json);
       } catch (err) {
         console.error("Error fetching videos:", err);
         setVideos([]);
@@ -45,46 +37,37 @@ export default function Home() {
       {loading && <p>Loading videos...</p>}
 
       {!loading && videos.length === 0 && (
-        <p>No videos found. Check your API key or channel IDs.</p>
+        <p>No videos found. Please check your API key or channel IDs.</p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-        {videos.map((video) => (
-          <div
-            key={video.id.videoId}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: "8px",
-              padding: "0.5rem",
-              display: "flex",
-              gap: "1rem",
-              alignItems: "center",
-            }}
-          >
-            <img
-              src={video.snippet.thumbnails.medium.url}
-              alt={video.snippet.title}
-              width={320}
-              height={180}
-              style={{ borderRadius: "4px" }}
-            />
-            <div>
-              <h3 style={{ margin: 0 }}>{video.snippet.title}</h3>
-              <p style={{ margin: 0, fontSize: "0.9rem", color: "#555" }}>
-                Channel: {video.channelId} |{" "}
-                {new Date(video.snippet.publishedAt).toLocaleDateString()}
+      {!loading && videos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+          {videos.map((video) => (
+            <div
+              key={video.id.videoId}
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                padding: "0.5rem",
+                width: "320px",
+              }}
+            >
+              <p style={{ fontWeight: "bold" }}>{video.channelTitle}</p>
+              <img
+                src={video.snippet.thumbnails.medium.url}
+                alt={video.snippet.title}
+                width={320}
+                height={180}
+                style={{ borderRadius: "4px" }}
+              />
+              <p>{video.snippet.title}</p>
+              <p style={{ fontSize: "0.8rem", color: "#555" }}>
+                {new Date(video.snippet.publishedAt).toLocaleString()}
               </p>
-              <a
-                href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Watch on YouTube
-              </a>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
