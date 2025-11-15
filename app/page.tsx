@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 interface Video {
   id: { videoId: string };
@@ -12,10 +12,9 @@ interface Video {
 export default function Home() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedChannels, setSelectedChannels] = useState<{ id: string; name: string }[]>([]);
+  const [allChannels, setAllChannels] = useState<{ id: string; name: string }[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -23,6 +22,13 @@ export default function Home() {
         const res = await fetch("/api/videos");
         const json: Video[] = await res.json();
         setVideos(json);
+
+        // build unique channels
+        const channelMap = new Map<string, string>();
+        json.forEach((v) => channelMap.set(v.channelId, v.channelTitle));
+        const uniqueChannels = Array.from(channelMap.entries()).map(([id, name]) => ({ id, name }));
+        setAllChannels(uniqueChannels);
+        setSelectedChannels(uniqueChannels); // select all by default
       } catch (err) {
         console.error("Error fetching videos:", err);
         setVideos([]);
@@ -34,25 +40,23 @@ export default function Home() {
     fetchVideos();
   }, []);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const handleRemoveChannel = (channelId: string) => {
+    setSelectedChannels((prev) => prev.filter((c) => c.id !== channelId));
+  };
 
-  // Get unique channel names
-  const allChannels = Array.from(new Set(videos.map((v) => v.channelTitle)));
+  const handleSelectChannel = (channel: { id: string; name: string }) => {
+    setSelectedChannels((prev) => [...prev, channel]);
+  };
 
-  // Filter videos based on selected channels
-  const filteredVideos =
-    selectedChannels.length === 0
-      ? videos
-      : videos.filter((v) => selectedChannels.includes(v.channelTitle));
+  const filteredChannels = allChannels.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !selectedChannels.some((s) => s.id === c.id)
+  );
+
+  const filteredVideos = videos.filter((v) =>
+    selectedChannels.some((c) => c.id === v.channelId)
+  );
 
   return (
     <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
@@ -60,107 +64,107 @@ export default function Home() {
 
       {loading && <p>Loading videos...</p>}
 
-      {!loading && videos.length === 0 && (
-        <p>No videos found. Please check your API key or channel IDs.</p>
-      )}
-
-      {!loading && videos.length > 0 && (
+      {!loading && allChannels.length > 0 && (
         <>
-          {/* Dropdown for channel selection */}
-          <div style={{ marginBottom: "1rem", position: "relative" }} ref={dropdownRef}>
-            <div
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: "4px",
-                padding: "0.5rem",
-                cursor: "pointer",
-                width: "250px",
-                background: "#fff",
-              }}
-            >
-              {selectedChannels.length > 0
-                ? selectedChannels.join(", ")
-                : "Select channels..."}
-            </div>
-
-            {dropdownOpen && (
+          {/* Selected channels as tags */}
+          <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+            {selectedChannels.map((channel) => (
               <div
+                key={channel.id}
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  border: "1px solid #ddd",
-                  borderRadius: "4px",
-                  background: "#fff",
-                  zIndex: 10,
-                  width: "250px",
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                  backgroundColor: "#e0e0e0",
+                  borderRadius: "16px",
+                  padding: "0.25rem 0.5rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
                 }}
               >
-                {allChannels.map((channel) => (
-                  <label
-                    key={channel}
-                    style={{ display: "block", padding: "0.5rem", cursor: "pointer" }}
-                  >
-                    <input
-                      type="checkbox"
-                      value={channel}
-                      checked={selectedChannels.includes(channel)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedChannels([...selectedChannels, channel]);
-                        } else {
-                          setSelectedChannels(
-                            selectedChannels.filter((c) => c !== channel)
-                          );
-                        }
-                      }}
-                      style={{ marginRight: "0.5rem" }}
-                    />
-                    {channel}
-                  </label>
-                ))}
+                {channel.name}
+                <button
+                  onClick={() => handleRemoveChannel(channel.id)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ×
+                </button>
               </div>
-            )}
-          </div>
-
-          {/* Video list */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-            {filteredVideos.map((video) => (
-              <a
-                key={video.id.videoId}
-                href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "block",
-                  border: "1px solid #ddd",
-                  borderRadius: "8px",
-                  padding: "0.5rem",
-                  width: "320px",
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                <p style={{ fontWeight: "bold" }}>{video.channelTitle}</p>
-                <img
-                  src={video.snippet.thumbnails.medium.url}
-                  alt={video.snippet.title}
-                  width={320}
-                  height={180}
-                  style={{ borderRadius: "4px" }}
-                />
-                <p>{video.snippet.title}</p>
-                <p style={{ fontSize: "0.8rem", color: "#555" }}>
-                  {new Date(video.snippet.publishedAt).toLocaleString()}
-                </p>
-              </a>
             ))}
           </div>
+
+          {/* Search & add channel */}
+          <div style={{ marginBottom: "1rem" }}>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search channels to add..."
+              style={{ padding: "0.25rem", width: "300px" }}
+            />
+            <div
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                padding: "0.5rem",
+                maxHeight: "150px",
+                overflowY: "auto",
+                marginTop: "0.25rem",
+              }}
+            >
+              {filteredChannels.map((channel) => (
+                <div
+                  key={channel.id}
+                  style={{ cursor: "pointer", padding: "0.25rem 0" }}
+                  onClick={() => handleSelectChannel(channel)}
+                >
+                  {channel.name} ➕
+                </div>
+              ))}
+              {filteredChannels.length === 0 && <div style={{ color: "#888" }}>No channels found</div>}
+            </div>
+          </div>
         </>
+      )}
+
+      {!loading && filteredVideos.length === 0 && <p>No videos found for selected channels.</p>}
+
+      {!loading && filteredVideos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+          {filteredVideos.map((video) => (
+            <a
+              key={video.id.videoId}
+              href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                border: "1px solid #ddd",
+                borderRadius: "8px",
+                padding: "0.5rem",
+                width: "320px",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <p style={{ fontWeight: "bold" }}>{video.channelTitle}</p>
+              <img
+                src={video.snippet.thumbnails.medium.url}
+                alt={video.snippet.title}
+                width={320}
+                height={180}
+                style={{ borderRadius: "4px" }}
+              />
+              <p>{video.snippet.title}</p>
+              <p style={{ fontSize: "0.8rem", color: "#555" }}>
+                {new Date(video.snippet.publishedAt).toLocaleString()}
+              </p>
+            </a>
+          ))}
+        </div>
       )}
     </div>
   );
