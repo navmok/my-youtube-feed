@@ -14,6 +14,9 @@ export async function GET() {
     }
 
     const channels = [
+      "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+      "UCWJ2lWNubArHWmf3FIHbfcQ",
+      "UCVHFbqXqoYvEWM1Ddxl0QDg",
       "UCoOae5nYA7VqaXzerajD0lg",
       "UCVWDbXqQ8cupuVpotWNt2eg",
       "UCIALMKvObZNtJ6AmdCLP7Lg",
