@@ -42,7 +42,7 @@ export async function GET() {
           const videosWithChannel = res.data.items.map((video) => ({
             ...video,
             channelId: id,
-            channelTitle: channelName,
+            channelTitle: video.snippet.channelTitle,
           }));
           allVideos.push(...videosWithChannel);
         }
