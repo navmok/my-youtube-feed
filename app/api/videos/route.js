@@ -11,9 +11,17 @@ export async function GET() {
     ];
 
     const apiKey = process.env.YOUTUBE_API_KEY;
+    // Debug: check if key exists
     if (!apiKey) {
-      return new Response(JSON.stringify([]), { status: 200 });
+      console.error("Vercel is not seeing YOUTUBE_API_KEY!");
+      return new Response(
+        JSON.stringify({ error: "API key not set in Vercel environment" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
     }
+  
+    // For security: don't print the key itself
+    console.log("Vercel sees the API key: ✅");
 
     const allVideos = [];
 
