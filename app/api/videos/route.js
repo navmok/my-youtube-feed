@@ -1,10 +1,13 @@
 // app/api/videos/route.js
+export const runtime = "nodejs"; // ensures Node.js runtime
+
 import axios from "axios";
 
 // GET /api/videos
 export async function GET() {
   try {
-    console.log("Environment variable YOUTUBE_API_KEY:", process.env.YOUTUBE_API_KEY);
+    console.log("process.env:", process.env);
+    console.log("YOUTUBE_API_KEY:", process.env.YOUTUBE_API_KEY);
     const apiKey = process.env.YOUTUBE_API_KEY;
 
     // Check if API key exists
