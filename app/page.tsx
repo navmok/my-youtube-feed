@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 
 interface Video {
   id: { videoId: string };
-  snippet: { title: string; thumbnails: { medium: { url: string } }; publishedAt: string };
+  snippet: { title: string; thumbnails: { medium: { url: string } }; publishedAt: string; channelTitle: string };
   channelId: string;
-  channelTitle: string;
 }
 
 export default function Home() {
@@ -16,19 +15,37 @@ export default function Home() {
   const [allChannels, setAllChannels] = useState<{ id: string; name: string }[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Cached videos in memory to avoid repeated API calls
+  const cachedVideosKey = "cachedVideos";
+  const cacheExpiryKey = "cachedVideosExpiry";
+
   useEffect(() => {
     const fetchVideos = async () => {
+      setLoading(true);
+
+      // Check if cached videos exist and are fresh (e.g., less than 1 hour old)
+      const cached = localStorage.getItem(cachedVideosKey);
+      const expiry = localStorage.getItem(cacheExpiryKey);
+      const now = Date.now();
+
+      if (cached && expiry && now < parseInt(expiry)) {
+        const json: Video[] = JSON.parse(cached);
+        setVideos(json);
+        buildChannels(json);
+        setLoading(false);
+        return;
+      }
+
       try {
         const res = await fetch("/api/videos");
         const json: Video[] = await res.json();
-        setVideos(json);
 
-        // build unique channels
-        const channelMap = new Map<string, string>();
-        json.forEach((v) => channelMap.set(v.channelId, v.channelTitle));
-        const uniqueChannels = Array.from(channelMap.entries()).map(([id, name]) => ({ id, name }));
-        setAllChannels(uniqueChannels);
-        setSelectedChannels(uniqueChannels); // select all by default
+        // Save to cache for 1 hour
+        localStorage.setItem(cachedVideosKey, JSON.stringify(json));
+        localStorage.setItem(cacheExpiryKey, (now + 60 * 60 * 1000).toString());
+
+        setVideos(json);
+        buildChannels(json);
       } catch (err) {
         console.error("Error fetching videos:", err);
         setVideos([]);
@@ -40,6 +57,14 @@ export default function Home() {
     fetchVideos();
   }, []);
 
+  const buildChannels = (json: Video[]) => {
+    const channelMap = new Map<string, string>();
+    json.forEach((v) => channelMap.set(v.channelId, v.snippet.channelTitle));
+    const uniqueChannels = Array.from(channelMap.entries()).map(([id, name]) => ({ id, name }));
+    setAllChannels(uniqueChannels);
+    setSelectedChannels(uniqueChannels); // select all by default
+  };
+
   const handleRemoveChannel = (channelId: string) => {
     setSelectedChannels((prev) => prev.filter((c) => c.id !== channelId));
   };
@@ -49,9 +74,8 @@ export default function Home() {
   };
 
   const filteredChannels = allChannels.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      !selectedChannels.some((s) => s.id === c.id)
+    (c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+           !selectedChannels.some((s) => s.id === c.id)
   );
 
   const filteredVideos = videos.filter((v) =>
@@ -66,37 +90,25 @@ export default function Home() {
 
       {!loading && allChannels.length > 0 && (
         <>
-          {/* Selected channels as tags */}
           <div style={{ marginBottom: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
             {selectedChannels.map((channel) => (
-              <div
-                key={channel.id}
-                style={{
+              <div key={channel.id} style={{
                   backgroundColor: "#e0e0e0",
                   borderRadius: "16px",
                   padding: "0.25rem 0.5rem",
                   display: "flex",
                   alignItems: "center",
                   gap: "0.25rem",
-                }}
-              >
+              }}>
                 {channel.name}
                 <button
                   onClick={() => handleRemoveChannel(channel.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                  }}
-                >
-                  ×
-                </button>
+                  style={{ background: "none", border: "none", cursor: "pointer", fontWeight: "bold" }}
+                >×</button>
               </div>
             ))}
           </div>
 
-          {/* Search & add channel */}
           <div style={{ marginBottom: "1rem" }}>
             <input
               type="text"
@@ -105,22 +117,9 @@ export default function Home() {
               placeholder="Search channels to add..."
               style={{ padding: "0.25rem", width: "300px" }}
             />
-            <div
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                padding: "0.5rem",
-                maxHeight: "150px",
-                overflowY: "auto",
-                marginTop: "0.25rem",
-              }}
-            >
+            <div style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "0.5rem", maxHeight: "150px", overflowY: "auto", marginTop: "0.25rem" }}>
               {filteredChannels.map((channel) => (
-                <div
-                  key={channel.id}
-                  style={{ cursor: "pointer", padding: "0.25rem 0" }}
-                  onClick={() => handleSelectChannel(channel)}
-                >
+                <div key={channel.id} style={{ cursor: "pointer", padding: "0.25rem 0" }} onClick={() => handleSelectChannel(channel)}>
                   {channel.name} ➕
                 </div>
               ))}
@@ -140,17 +139,9 @@ export default function Home() {
               href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "block",
-                border: "1px solid #ddd",
-                borderRadius: "8px",
-                padding: "0.5rem",
-                width: "320px",
-                textDecoration: "none",
-                color: "inherit",
-              }}
+              style={{ display: "block", border: "1px solid #ddd", borderRadius: "8px", padding: "0.5rem", width: "320px", textDecoration: "none", color: "inherit" }}
             >
-              <p style={{ fontWeight: "bold" }}>{video.channelTitle}</p>
+              <p style={{ fontWeight: "bold" }}>{video.snippet.channelTitle}</p>
               <img
                 src={video.snippet.thumbnails.medium.url}
                 alt={video.snippet.title}
