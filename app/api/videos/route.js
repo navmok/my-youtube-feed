@@ -1,8 +1,13 @@
-export const runtime = "nodejs"; // ensures Node.js runtime
-
+export const runtime = "nodejs";
 import axios from "axios";
 
-// GET /api/videos
+const MAX_RESULTS = 5; // reduce number of videos per channel
+const CHANNELS = [
+  "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+  "UCWJ2lWNubArHWmf3FIHbfcQ",
+  "UCVHFbqXqoYvEWM1Ddxl0QDg",
+];
+
 export async function GET() {
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
@@ -13,71 +18,31 @@ export async function GET() {
       });
     }
 
-    const channels = [
-    "UC_x5XG1OV2P6uZZ5FSM9Ttw", // Google Developers
-    "UCWJ2lWNubArHWmf3FIHbfcQ", // Google
-    "UCVHFbqXqoYvEWM1Ddxl0QDg", // Chrome Developers
-  
-    // "UCoOae5nYA7VqaXzerajD0lg",
-    // "UCVWDbXqQ8cupuVpotWNt2eg",
-    // "UCIALMKvObZNtJ6AmdCLP7Lg",
-    // "UCmh2BRfezDEhDCm_x9gyJ-w",
-    // "UCvJJ_dzjViJCoLf5uKUTwoA",
-    // "UCrp_UI8XtuYfpiqluWLD7Lw",
-    // "UCOmcA3f_RrH6b9NmcNa4tdg",
-    // "UCupvZG-5ko_eiXAupbDfxWw",
-    // "UCVYamHliCI9rw1tHR1xbkfw",
-    // "UC-CSyyi47VX1lD9zyeABW3w",
-    // "UCkw6A6Zmand6UhZnIODLRcA",
-    // "UC-6OW5aJYBFM33zXQlBKPNA",
-    // "UCpvyOqtEc86X8w8_Se0t4-w",
-    // "UCV6KDgJskWaEckne5aPA0aQ",
-    // "UCb825Ij-6qnlRr66VZVj8PQ",
-    // "UCzomXQvDl2UblYIjBoFR8aw",
-    // "UCXZvhCBxTSvPf38GN0NtKiw",
-    // "UCZRoNJu1OszFqABP8AuJIuw",
-    // "UCBJycsmduvYEL83R_U4JriQ",
-    // "UCUvvj5lwue7PspotMDjk5UA",
-    // "UCz4a7agVFr1TxU-mpAP8hkw",
-    // "UCMiJRAwDNSNzuYeN2uWa0pA",
-    // "UCHm8vWol8eNjTJZSjq2jaLQ",
-    // "UCqKJtQcXMnYMEJAzorQgbGA",
-    // "UCE5RIa7b_JIK0a31Uaq4xRw",
-    // "UCKZozRVHRYsYHGEyNKuhhdA",
-    // "UCEAZeUIeJs0IjQiqTCdVSIg",
-  ];
-
-    const allVideos = [];
-
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const publishedAfter = thirtyDaysAgo.toISOString();
 
-    for (const id of channels) {
-      try {
-        // Get channel info
-        const channelRes = await axios.get(
-          `https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&id=${id}&part=snippet`
-        );
-        const channelName =
-          channelRes.data.items?.[0]?.snippet?.title || "Unknown Channel";
+    const allVideos = [];
 
-        // Get videos
-        const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${id}&part=snippet&type=video&order=date&maxResults=10&publishedAfter=${publishedAfter}`;
-        const res = await axios.get(url);
+    await Promise.all(
+      CHANNELS.map(async (id) => {
+        try {
+          const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${id}&part=snippet&type=video&order=date&maxResults=${MAX_RESULTS}&publishedAfter=${publishedAfter}`;
+          const res = await axios.get(url);
 
-        if (Array.isArray(res.data.items)) {
-          const videosWithChannel = res.data.items.map((video) => ({
-            ...video,
-            channelId: id,
-            channelTitle: video.snippet.channelTitle,
-          }));
-          allVideos.push(...videosWithChannel);
+          if (Array.isArray(res.data.items)) {
+            allVideos.push(
+              ...res.data.items.map((video) => ({
+                ...video,
+                channelId: id,
+              }))
+            );
+          }
+        } catch (err) {
+          console.error(`Failed to fetch channel ${id}:`, err.message);
         }
-      } catch (err) {
-        console.error(`Failed to fetch channel ${id}:`, err.message);
-      }
-    }
+      })
+    );
 
     allVideos.sort(
       (a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt)
@@ -88,7 +53,7 @@ export async function GET() {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("Unexpected error in /api/videos:", err.message);
+    console.error("Unexpected error:", err.message);
     return new Response(JSON.stringify({ error: "Unexpected server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
